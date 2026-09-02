@@ -1,0 +1,17 @@
+{
+  "name": "lerdos-ptt-relay",
+  "version": "1.0.0",
+  "description": "Relay WebSocket en tiempo real para el walkie-talkie de Lerdos (motorizado <-> central).",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
