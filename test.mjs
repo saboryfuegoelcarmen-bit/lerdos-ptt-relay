@@ -44,6 +44,19 @@ await new Promise((done) => {
 });
 check('Central->Motorizado: audio llega al rider', centralToRider);
 
+// 3) Roster: la Central recibe la lista de motorizados conectados.
+let gotRoster = [];
+await new Promise((done) => {
+  central.on('message', raw => {
+    const m = JSON.parse(raw);
+    if (m.type==='roster'){ gotRoster = m.riders||[]; done(); }
+  });
+  central.send(JSON.stringify({type:'roster_req'}));
+  setTimeout(done, 1500);
+});
+check('Central: recibe roster con el motorizado conectado',
+  gotRoster.some(r=>r.name==='Pedro Elias'), JSON.stringify(gotRoster));
+
 console.log(logs.join('\n'));
 console.log(`\n${pass} pass, ${fail} fail`);
 process.exit(fail?1:0);

@@ -58,6 +58,22 @@ function broadcastTalking(info, active) {
   for (const c of centralSockets) send(c, msg);
 }
 
+/** Lista actual de riders conectados (para que la Central muestre quien esta al aire). */
+function roster() {
+  const list = [];
+  for (const r of riderSockets) {
+    const info = peerInfo.get(r);
+    if (info) list.push({ id: info.id, name: info.name, role: info.role });
+  }
+  return list;
+}
+
+/** Envia el roster actualizado a todas las centrales. */
+function broadcastRoster() {
+  const msg = { type: 'roster', riders: roster() };
+  for (const c of centralSockets) send(c, msg);
+}
+
 wss.on('connection', (socket) => {
   let connected = false;
 
@@ -86,6 +102,14 @@ wss.on('connection', (socket) => {
 
         send(socket, { type: 'auth_ok', role, id: info.id, name: info.name });
         log(`Conectado ${role} "${info.name}" (${info.id}) — riders:${riderSockets.size} central:${centralSockets.size}`);
+        // Actualizo el roster en todas las centrales cuando entra/sale un rider.
+        if (role === 'rider') broadcastRoster();
+        break;
+      }
+
+      case 'roster_req': {
+        if (!connected) break;
+        send(socket, { type: 'roster', riders: roster() });
         break;
       }
 
@@ -125,20 +149,24 @@ wss.on('connection', (socket) => {
     }
   });
 
-  socket.on('close', () => {
-    const info = peerInfo.get(socket);
-    if (info) {
-      log(`Desconectado ${info.role} "${info.name}"`);
-      if (info.role === 'central') centralSockets.delete(socket);
-      else riderSockets.delete(socket);
-      // Si ese rider estaba hablando, avisamos que dejo de hablar.
-      if (info.role === 'rider' && centralSockets.size && info) {
-        broadcastTalking(info, false);
+    socket.on('close', () => {
+      const info = peerInfo.get(socket);
+      if (info) {
+        log(`Desconectado ${info.role} "${info.name}"`);
+        if (info.role === 'central') centralSockets.delete(socket);
+        else {
+          riderSockets.delete(socket);
+          // Al quitarse un rider, renovamos la lista en las centrales.
+          broadcastRoster();
+        }
+        // Si ese rider estaba hablando, avisamos que dejo de hablar.
+        if (info.role === 'rider' && centralSockets.size && info) {
+          broadcastTalking(info, false);
+        }
       }
-    }
-    peerInfo.delete(socket);
-    socket.terminate();
-  });
+      peerInfo.delete(socket);
+      socket.terminate();
+    });
 
   socket.on('error', () => {
     try { socket.terminate(); } catch (_) {}
